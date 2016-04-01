@@ -1,6 +1,19 @@
 import random
 import math
 
+file_names = ['cross200.txt', 'elliptic200.txt']
+
+
+def readfile(file_name: str) -> ([], []):
+    inputs = []
+    outputs = []
+    with open(file_name, 'r') as file:
+        for line in file:
+            (x, y, c) = filter((lambda x: x.__len__()), line.strip(' \n').split(' '))
+            inputs.append([float(x), float(y)])
+            outputs.append(int(c))
+    return (inputs, outputs)
+
 
 def random_floats(count: int) -> [float]:
     random.seed()
@@ -14,15 +27,22 @@ def calc_logistic_result(x: float) -> float:
 class NeuralNetwork:
     LEARNING_RATE = 0.5
 
-    def __init__(self, num_of_inputs, num_of_hidden_neuron, num_of_output_neuron = 1):
-
-        # init
-        self.hidden_layer = NeuralLayer(num_of_hidden_neuron, num_of_inputs)
+    def __init__(self, dimension_of_input, num_of_hidden_neuron, num_of_output_neuron = 1):
+        self.hidden_layer = NeuralLayer(num_of_hidden_neuron, dimension_of_input)
         self.output_layer = NeuralLayer(num_of_output_neuron, num_of_hidden_neuron)
 
-    def feed_forward(self, inputs: [float]):
+    def feed_forward(self, inputs: [float]) -> None:
         hidden_outputs = self.hidden_layer.feed_forward(inputs)
         self.output_layer.feed_forward(hidden_outputs)
+
+    def inspect(self):
+        print('------')
+        print('Hidden Layer: ', end='')
+        self.hidden_layer.inspect()
+        print('------')
+        print('* Output Layer: ', end='')
+        self.output_layer.inspect()
+        print('------')
 
 
 class NeuralLayer:
@@ -40,6 +60,14 @@ class NeuralLayer:
         for n in self.neurons:
             outputs.append(n.calc_output(inputs))
         return outputs
+
+    def inspect(self):
+        print('Neurons:', len(self.neurons))
+        for n in range(len(self.neurons)):
+            print(' Neuron ', n)
+            print('  Bias:', self.neurons[n].bias)
+            for w in range(len(self.neurons[n].weights)):
+                print('  Weight', w, ':', self.neurons[n].weights[w])
 
 
 class Neuron:
@@ -62,3 +90,16 @@ class Neuron:
         assert self.len != -1
         net_sum = [self.weights[i] * self.inputs[i] for i in range(self.len)]
         return sum(net_sum) + self.bias
+
+
+if __name__ == "__main__":
+    inputs = []
+    outputs = []
+    for file_name in file_names:
+        (input_, output_) = readfile(file_name)
+        inputs += input_
+        outputs += output_
+
+    hidden_neuron = 32
+    nn = NeuralNetwork(dimension_of_input=2, num_of_hidden_neuron=hidden_neuron, num_of_output_neuron=1)
+    nn.inspect()
