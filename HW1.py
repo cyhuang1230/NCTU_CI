@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import datetime
 import sys
 
+
 def readfile(file_name: str) -> ([], []):
     inputs = []
     outputs = []
@@ -34,6 +35,18 @@ def calc_logistic_result(x: float) -> float:
     return 1 / (1 + math.exp(-x))
 
 
+def log(s, end='\n', file=None):
+
+    if file is None:
+        global log_file
+        if log_file is not None:
+            file = log_file
+        else:
+            file = sys.stdout
+
+    print(s, end=end, file=file)
+
+
 class NeuralNetwork:
 
     MAX_EPOCH = -1
@@ -42,7 +55,7 @@ class NeuralNetwork:
     def __init__(self, dimension_of_input, num_of_hidden_neuron):
 
         # init variables
-        self.learning_rate = 0.05
+        self.learning_rate = 0.01
         self.epoch = 0
         self.data = []
         self.results = []
@@ -147,28 +160,28 @@ class NeuralNetwork:
         return self.feed_forward(inputs)[0]
 
     def inspect(self):
-        print('------')
-        print('Hidden Layer: ', end='')
+        log('------')
+        log('Hidden Layer: ', end='')
         self.hidden_layer.inspect()
-        print('------')
-        print('* Output Layer: ', end='')
+        log('------')
+        log('* Output Layer: ', end='')
         self.output_layer.inspect()
-        print('------')
+        log('------')
 
     def debug(self):
-        print('--debug--')
-        print('Hidden Layer:')
+        log('--debug--')
+        log('Hidden Layer:')
         for n in self.hidden_layer.neurons:
-            print('inputs: ', end='')
-            print(n.inputs)
-            print('output: ', end='')
-            print(n.output)
-        print('Output Layer:')
+            log('inputs: ', end='')
+            log(n.inputs)
+            log('output: ', end='')
+            log(n.output)
+        log('Output Layer:')
         for n in self.output_layer.neurons:
-            print('inputs: ', end='')
-            print(n.inputs)
-            print('output: ', end='')
-            print(n.output)
+            log('inputs: ', end='')
+            log(n.inputs)
+            log('output: ', end='')
+            log(n.output)
 
 
 class NeuralLayer:
@@ -188,12 +201,12 @@ class NeuralLayer:
         return outputs
 
     def inspect(self):
-        print('Neurons:', len(self.neurons))
+        log('%d neurons' %len(self.neurons))
         for n in range(len(self.neurons)):
-            print(' Neuron ', n)
-            print('  Bias:', self.neurons[n].bias)
+            log(' Neuron %d' %n)
+            log('  Bias: %f' %self.neurons[n].bias)
             for w in range(len(self.neurons[n].weights)):
-                print('  Weight', w, ':', self.neurons[n].weights[w])
+                log('  Weight %d: %f' %(w, self.neurons[n].weights[w]))
 
 
 class Neuron:
@@ -226,118 +239,126 @@ if __name__ == "__main__":
 
     start_time = datetime.datetime.now()
     timestamp = start_time.timestamp()
-    sys.stdout = open('%u_log.txt' %timestamp, 'w+')
 
-    hidden_neuron = 32 if sys.argv[1] == None else int(sys.argv[1])
-    NeuralNetwork.MAX_EPOCH = int(sys.argv[2]) if sys.argv[2] is not None else 10000
+    try:
+        log_file_name = '%u_log.txt' %timestamp
+        # sys.stdout = open('%u_log.txt' %timestamp, 'w+')
+        log_file = open(log_file_name, 'w+')
+        print('Writing to log file `%s`' %log_file_name)
 
-    # inputs = []
-    # outputs = []
-    # for file_name in file_names:
-    #     (input_, output_) = readfile(file_name)
-    #     inputs += input_
-    #     outputs += output_
+        hidden_neuron = int(sys.argv[1]) if sys.argv.__len__() >= 2 else 2
+        NeuralNetwork.MAX_EPOCH = int(sys.argv[2]) if sys.argv.__len__() >= 3 else 50
 
-    file_names = ['cross200.txt', 'elliptic200.txt']
-    # file_names = ['c.txt']
-    inputs = []
-    for file_name in file_names:
-        input_ = readfile_single(file_name)
-        inputs += input_
+        # inputs = []
+        # outputs = []
+        # for file_name in file_names:
+        #     (input_, output_) = readfile(file_name)
+        #     inputs += input_
+        #     outputs += output_
 
-    random.shuffle(inputs)
-    validation_size = 30
-    training_set = inputs[:-validation_size]
-    validation_set = inputs[-validation_size:]
+        file_names = ['cross200.txt', 'elliptic200.txt']
+        # file_names = ['c.txt']
+        inputs = []
+        for file_name in file_names:
+            input_ = readfile_single(file_name)
+            inputs += input_
 
-    training_set_len = training_set.__len__()
-    validation_set_len = validation_set.__len__()
+        # random.shuffle(inputs)
+        validation_size = 80
+        block_size = int(validation_size/2)
+        training_set = inputs[block_size:-block_size]
+        validation_set = inputs[:block_size] + inputs[-block_size:]
 
-    # XOR
-    # training_set = [
-    #     [0, 0, 0],
-    #     [0, 1, 1],
-    #     [1, 0, 1],
-    #     [1, 1, 0]
-    # ]
-    # validation_set = [
-    #     [0, 0, 0.1],
-    #     [0, 1, 1.1],
-    #     [1, 0, 0.98],
-    #     [1, 1, 0.01]
-    # ]
+        training_set_len = training_set.__len__()
+        validation_set_len = validation_set.__len__()
 
-    nn = NeuralNetwork(dimension_of_input=2, num_of_hidden_neuron=hidden_neuron)
-    nn.train_online(training_set, validation_set)
-    results, validation = nn.results, nn.results_validation
-    end_time = datetime.datetime.now()
-    print("(%u) Total %d epochs, time elapsed: %s" %(timestamp, nn.epoch, end_time-start_time))
+        # XOR
+        # training_set = [
+        #     [0, 0, 0],
+        #     [0, 1, 1],
+        #     [1, 0, 1],
+        #     [1, 1, 0]
+        # ]
+        # validation_set = [
+        #     [0, 0, 0.1],
+        #     [0, 1, 1.1],
+        #     [1, 0, 0.98],
+        #     [1, 1, 0.01]
+        # ]
 
-    # print(results)
+        nn = NeuralNetwork(dimension_of_input=2, num_of_hidden_neuron=hidden_neuron)
+        nn.train_online(training_set, validation_set)
+        results, validation = nn.results, nn.results_validation
+        end_time = datetime.datetime.now()
+        log("(%u) Total %d epochs, time elapsed: %s" %(timestamp, nn.epoch, end_time-start_time))
 
-    figure_filename = '%u-%dhidden-%.2flr-%dtraining-%dvalidation' \
-                      % (timestamp, hidden_neuron, nn.learning_rate, training_set_len, validation_set_len)
-    figure_map_filename = figure_filename + '-map'
+        # print(results)
 
-    figure_title = '%dHN, %.2fLR, %dTS, %dVS' \
-                   % (hidden_neuron, nn.learning_rate, training_set_len, validation_set_len)
+        figure_filename = '%u-%dhidden-%.2flr-%dtraining-%dvalidation' \
+                          % (timestamp, hidden_neuron, nn.learning_rate, training_set_len, validation_set_len)
+        figure_map_filename = figure_filename + '-map'
 
-    results_len = results.__len__()
-    x = list(range(results_len))  # use len instead of epoch to avoid error when interrupt
-    fig_j = plt.figure(1)
-    plt.plot(x, results, 'r', label='Training set')
-    # plt.axis([-1, results.__len__(), min(results) * 0.98, max(results) * 1.02])
-    plt.plot(x, validation, 'g', label='Validation set')
-    plt.axis([max(-1, -0.01*results_len), results_len,
-              min(min(results)*0.98, min(validation)*0.98), max(max(results)*1.02, max(validation)*1.02)])
-    plt.xlabel('epoch')
-    plt.ylabel('J')
-    plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1), ncol=2, fancybox=True, shadow=True)
-    fig_j.canvas.set_window_title(figure_filename)
-    ax = fig_j.add_subplot(111)
-    ax.set_title(figure_title)
-    plt.savefig(figure_filename + '.png')
+        figure_title = '%dHN, %.2fLR, %dTS, %dVS' \
+                       % (hidden_neuron, nn.learning_rate, training_set_len, validation_set_len)
 
-    # show map
-    fig_map = plt.figure(2)
-    fig_map.canvas.set_window_title(figure_map_filename)
-    ax = fig_map.add_subplot(111)
-    plt.grid()
-    plt.axis([-1, 1, -1, 1])
-    training_correct_count = 0
-    for i in training_set:
-        cur_output = nn.get_output([i[0], i[1]])
-        target_class = i[2]
-        cur_class = 0 if abs(cur_output - 1) > abs(cur_output - 0) else 1
-        # cur_class = 2 if abs(cur_output-1) > abs(cur_output-2) else 1
-        is_correct = (cur_class == i[2])
-        if is_correct:
-            training_correct_count += 1
-        print('(%f,%f) => cur_output = %f, cur_class = %d, target_class = %d, is_correct = %d'
-              % (i[0], i[1], cur_output, cur_class, target_class, is_correct))
-        plt.plot(i[0], i[1], ('g' if is_correct else 'r') + ('x' if target_class == 0 else '+'))
+        results_len = results.__len__()
+        x = list(range(results_len))  # use len instead of epoch to avoid error when interrupt
+        fig_j = plt.figure(1)
+        plt.plot(x, results, 'r', label='Training set')
+        # plt.axis([-1, results.__len__(), min(results) * 0.98, max(results) * 1.02])
+        plt.plot(x, validation, 'g', label='Validation set')
+        plt.axis([max(-1, -0.01*results_len), results_len,
+                  min(min(results)*0.98, min(validation)*0.98), max(max(results)*1.02, max(validation)*1.02)])
+        plt.xlabel('epoch')
+        plt.ylabel('J')
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1), ncol=2, fancybox=True, shadow=True)
+        fig_j.canvas.set_window_title(figure_filename)
+        ax = fig_j.add_subplot(111)
+        ax.set_title(figure_title)
+        plt.savefig(figure_filename + '.png')
 
-    print('--- validation set ---')
-    validation_correct_count = 0
-    for i in validation_set:
-        cur_output = nn.get_output([i[0], i[1]])
-        target_class = i[2]
-        cur_class = 0 if abs(cur_output - 1) > abs(cur_output - 0) else 1
-        # cur_class = 2 if abs(cur_output-1) > abs(cur_output-2) else 1
-        is_correct = (cur_class == i[2])
-        if is_correct:
-            validation_correct_count += 1
-        print('(%f,%f) => cur_output = %f, cur_class = %d, target_class = %d, is_correct = %d'
-              % (i[0], i[1], cur_output, cur_class, target_class, is_correct))
-        plt.plot(i[0], i[1], ('g' if is_correct else 'r') + ('*' if target_class == 0 else 'o'))
+        # show map
+        fig_map = plt.figure(2)
+        fig_map.canvas.set_window_title(figure_map_filename)
+        ax = fig_map.add_subplot(111)
+        plt.grid()
+        plt.axis([-1, 1, -1, 1])
+        training_correct_count = 0
+        for i in training_set:
+            cur_output = nn.get_output([i[0], i[1]])
+            target_class = i[2]
+            cur_class = 0 if abs(cur_output - 1) > abs(cur_output - 0) else 1
+            # cur_class = 2 if abs(cur_output-1) > abs(cur_output-2) else 1
+            is_correct = (cur_class == i[2])
+            if is_correct:
+                training_correct_count += 1
+            log('(%f,%f) => cur_output = %f, cur_class = %d, target_class = %d, is_correct = %d'
+                  % (i[0], i[1], cur_output, cur_class, target_class, is_correct))
+            plt.plot(i[0], i[1], ('g' if is_correct else 'r') + ('x' if target_class == 0 else '+'))
 
-    ax.set_title('%dHN, %.2fLR, %d/%d(%.2f%%)TS, %d/%d(%.2f%%)VS'
-                 % (hidden_neuron, nn.learning_rate,
-                    training_correct_count, training_set_len, 100*training_correct_count/training_set_len,
-                    validation_correct_count, validation_set_len, 100*validation_correct_count/validation_set_len))
+        log('--- validation set ---')
+        validation_correct_count = 0
+        for i in validation_set:
+            cur_output = nn.get_output([i[0], i[1]])
+            target_class = i[2]
+            cur_class = 0 if abs(cur_output - 1) > abs(cur_output - 0) else 1
+            # cur_class = 2 if abs(cur_output-1) > abs(cur_output-2) else 1
+            is_correct = (cur_class == i[2])
+            if is_correct:
+                validation_correct_count += 1
+            log('(%f,%f) => cur_output = %f, cur_class = %d, target_class = %d, is_correct = %d'
+                  % (i[0], i[1], cur_output, cur_class, target_class, is_correct), )
+            plt.plot(i[0], i[1], ('g' if is_correct else 'r') + ('*' if target_class == 0 else 'o'))
 
-    nn.inspect()
-    plt.savefig(figure_map_filename + '.png')
+        ax.set_title('%dHN, %.2fLR, %d/%d(%.2f%%)TS, %d/%d(%.2f%%)VS'
+                     % (hidden_neuron, nn.learning_rate,
+                        training_correct_count, training_set_len, 100*training_correct_count/training_set_len,
+                        validation_correct_count, validation_set_len, 100*validation_correct_count/validation_set_len))
 
-    # plt.show()
+        nn.inspect()
+        plt.savefig(figure_map_filename + '.png')
 
+        # plt.show()
+
+    finally:
+        log_file.close()
