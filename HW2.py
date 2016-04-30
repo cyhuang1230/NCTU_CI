@@ -1,6 +1,6 @@
 import random
 from enum import IntEnum
-
+import heapq
 
 def random_ints(count: int, limit: int = 1) -> [int]:
     """
@@ -13,13 +13,15 @@ def random_ints(count: int, limit: int = 1) -> [int]:
 
 
 def print_custom(l: list):
+    print('-- begin ---')
     for i in l:
         print(i.__str__())
+    print('-- end ---')
 
 
 class Individual:
 
-    def __init__(self, k:int, genes: [int]):
+    def __init__(self, k: int, genes: [int], data=None):
         """
         :param k:
         :param genes: a list of int indicating the cluster each point belongs to
@@ -29,22 +31,23 @@ class Individual:
         self.genes = genes
         self.fitness = None
         self.centroids = None
+        self.data = data
 
-    def get_fitness(self, data: [int]) -> float:
+    def get_fitness(self) -> float:
         if self.fitness is None:
             self.fitness = 0.0
-            centroids = self.get_centroids(data)
+            centroids = self.get_centroids()
             for i in range(self.gene_size):
-                self.fitness += pow(data[i] - centroids[self.genes[i]], 2)
+                self.fitness += pow(self.data[i] - centroids[self.genes[i]], 2)
         return self.fitness
 
-    def get_centroids(self, data: [int]) -> [float]:
+    def get_centroids(self) -> [float]:
         if self.centroids is None:
             num_of_points_in_cluster = [0] * self.k
             sum_of_coordinate_in_cluster = [0.0] * self.k
             for i in range(self.gene_size):
                 cluster_num = self.genes[i]
-                coordinate = data[i]
+                coordinate = self.data[i]
                 num_of_points_in_cluster[cluster_num] += 1
                 sum_of_coordinate_in_cluster[cluster_num] += coordinate
             self.centroids = [sum_of_coordinate_in_cluster[i]/num_of_points_in_cluster[i] for i in range(self.k)]
@@ -60,12 +63,14 @@ class Individual:
                 return False
         return True
 
-    def __str__(self, data=None):
+    def __str__(self):
         return "k = %d, data = %s, genes = %s, fitness = %.3f, centroids = %s" \
-               % (self.k, data if data else 'None', self.genes.__str__(),
-                  self.fitness if self.fitness else self.get_fitness(data) if data else -1,
-                  self.get_centroids(data).__str__())
+               % (self.k, self.data if self.data else 'None', self.genes.__str__(),
+                  self.fitness if self.fitness else self.get_fitness(),
+                  self.get_centroids().__str__())
 
+    def __lt__(self, other):
+        return self.get_fitness() < other.get_fitness()
 
 class ParentSelectionMethod(IntEnum):
     FITNESS_BASED = 1   # @TODO
@@ -73,7 +78,7 @@ class ParentSelectionMethod(IntEnum):
 
 
 class EvolutionaryAlgorithm:
-    POPULATION_SIZE = 100
+    POPULATION_SIZE = 30
     PARENT_SELECTION = ParentSelectionMethod.TOURNAMENT_SELECTION
 
     def __init__(self, k: int, data: [int]):
@@ -81,20 +86,25 @@ class EvolutionaryAlgorithm:
         self.data_size = len(data)
         self.data = data
         self.population = []
+        self.best_individual = None
 
         # generate enough `valid` individuals
         kount = 0
         while kount < self.POPULATION_SIZE:
-            an_idv = Individual(k, random_ints(self.data_size, self.k))
+            an_idv = Individual(k, random_ints(self.data_size, self.k), data)
             if not an_idv.is_valid():
                 continue
             self.population.append(an_idv)
             kount += 1
 
+        # make population a heap to improve performance
+        heapq.heapify(self.population)
+        self.best_individual = self.choose_best_individual()
+
     def __str__(self):
         ret = ''
         for p in self.population:
-            ret += p.__str__(self.data) + '\n'
+            ret += p.__str__() + '\n'
         return ret
 
     def do(self, generation_count: int):
@@ -117,12 +127,15 @@ class EvolutionaryAlgorithm:
             parents = []
             for _ in range(2):
                 participants = [self.population[i] for i in random.sample(range(self.POPULATION_SIZE), 2)]
-                participants.sort(key=lambda p: p.get_fitness(self.data), reverse=True)
+                participants.sort(reverse=True)
                 # if prob in [0,0.8], choose the winner (i.e., participant[0])
                 # else if prob in (0.8,1], choose the loser (i.e., participant[1])
                 prob = random.uniform(0, 1)
                 parents.append(participants[int(prob/0.8)])
             return parents
+
+    def choose_best_individual(self):
+        return heapq.nlargest(1, self.population)[0]
 
 if __name__ == '__main__':
 
