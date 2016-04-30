@@ -72,14 +72,23 @@ class Individual:
     def __lt__(self, other):
         return self.get_fitness() < other.get_fitness()
 
+
 class ParentSelectionMethod(IntEnum):
     FITNESS_BASED = 1   # @TODO
     TOURNAMENT_SELECTION = 2
 
 
+class CrossoverMethod(IntEnum):
+    MEAN = 1
+    ONE_POINT_ = 2  # @TODO
+    TWO_POINT = 3   # @TODO
+    UNIFORM = 4     # @TODO
+
+
 class EvolutionaryAlgorithm:
     POPULATION_SIZE = 30
     PARENT_SELECTION = ParentSelectionMethod.TOURNAMENT_SELECTION
+    CROSSOVER = CrossoverMethod.MEAN
 
     def __init__(self, k: int, data: [int]):
         self.k = k
@@ -109,16 +118,16 @@ class EvolutionaryAlgorithm:
 
     def do(self, generation_count: int):
 
-        # parent selection
+        # Parent selection
         parents = self.choose_parent()
-        print_custom(parents)
 
-        # recombination
+        # Crossover
+        children = self.do_crossover(parents)
 
-        # mutation
-
-        # survivor selection
-        pass
+        # Mutation & Survivor selection
+        for child in children:
+            child = self.do_mutation(child)
+            heapq.heappushpop(self.population, child)
 
     def choose_parent(self) -> [Individual]:
         if self.PARENT_SELECTION == ParentSelectionMethod.FITNESS_BASED:
@@ -128,14 +137,20 @@ class EvolutionaryAlgorithm:
             for _ in range(2):
                 participants = [self.population[i] for i in random.sample(range(self.POPULATION_SIZE), 2)]
                 participants.sort(reverse=True)
+                prob = random.uniform(0, 1)
                 # if prob in [0,0.8], choose the winner (i.e., participant[0])
                 # else if prob in (0.8,1], choose the loser (i.e., participant[1])
-                prob = random.uniform(0, 1)
                 parents.append(participants[int(prob/0.8)])
             return parents
 
     def choose_best_individual(self):
         return heapq.nlargest(1, self.population)[0]
+
+    def do_crossover(self, parents: [Individual]) -> [Individual]:
+        pass
+
+    def do_mutation(self, an_idv: Individual) -> Individual:
+        pass
 
 if __name__ == '__main__':
 
