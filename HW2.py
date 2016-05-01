@@ -35,23 +35,33 @@ class Individual:
 
     def get_fitness(self) -> float:
         if self.fitness is None:
-            self.fitness = 0.0
-            centroids = self.get_centroids()
-            for i in range(self.gene_size):
-                self.fitness += pow(self.data[i] - centroids[self.genes[i]], 2)
+            self.update_fitness()
         return self.fitness
 
     def get_centroids(self) -> [float]:
         if self.centroids is None:
-            num_of_points_in_cluster = [0] * self.k
-            sum_of_coordinate_in_cluster = [0.0] * self.k
-            for i in range(self.gene_size):
-                cluster_num = self.genes[i]
-                coordinate = self.data[i]
-                num_of_points_in_cluster[cluster_num] += 1
-                sum_of_coordinate_in_cluster[cluster_num] += coordinate
-            self.centroids = [sum_of_coordinate_in_cluster[i]/num_of_points_in_cluster[i] for i in range(self.k)]
+            self.update_centroids()
         return self.centroids
+
+    def update(self):
+        self.update_centroids()
+        self.update_fitness()
+
+    def update_fitness(self):
+        self.fitness = 0.0
+        centroids = self.get_centroids()
+        for i in range(self.gene_size):
+            self.fitness += pow(self.data[i] - centroids[self.genes[i]], 2)
+
+    def update_centroids(self):
+        num_of_points_in_cluster = [0] * self.k
+        sum_of_coordinate_in_cluster = [0.0] * self.k
+        for i in range(self.gene_size):
+            cluster_num = self.genes[i]
+            coordinate = self.data[i]
+            num_of_points_in_cluster[cluster_num] += 1
+            sum_of_coordinate_in_cluster[cluster_num] += coordinate
+        self.centroids = [sum_of_coordinate_in_cluster[i] / num_of_points_in_cluster[i] for i in range(self.k)]
 
     # only valid if there's at least one point in each cluster
     def is_valid(self) -> bool:
@@ -70,7 +80,8 @@ class Individual:
                   self.get_centroids().__str__())
 
     def __lt__(self, other):
-        return self.get_fitness() < other.get_fitness()
+        # in our case, fitness is the lower the better
+        return self.get_fitness() > other.get_fitness()
 
 
 class ParentSelectionMethod(IntEnum):
@@ -82,20 +93,21 @@ class CrossoverMethod(IntEnum):
     MEAN = 1
     ONE_POINT = 2
     TWO_POINT = 3
-    UNIFORM = 4     # @TODO
+    UNIFORM = 4
 
 
 class EvolutionaryAlgorithm:
-    POPULATION_SIZE = 30
+    POPULATION_SIZE = 100
     PARENT_SELECTION = ParentSelectionMethod.TOURNAMENT_SELECTION
     CROSSOVER = CrossoverMethod.MEAN
+    MUTATE_PROBABILITY = 0.4
 
     def __init__(self, k: int, data: [int]):
         self.k = k
         self.data_size = len(data)
         self.data = data
         self.population = []
-        self.best_individual = None
+        self.result = []
 
         # generate enough `valid` individuals
         kount = 0
@@ -108,7 +120,8 @@ class EvolutionaryAlgorithm:
 
         # make population a heap to improve performance
         heapq.heapify(self.population)
-        self.best_individual = self.choose_best_individual()
+
+        self.record_result()
 
     def __str__(self):
         ret = ''
@@ -116,28 +129,41 @@ class EvolutionaryAlgorithm:
             ret += p.__str__() + '\n'
         return ret
 
-    def do(self, kount_generation: int):
+    def do(self, generation: int):
 
-        # Parent selection
-        parents = self.choose_parent()
-        print('--- parents ---')
-        print_custom(parents)
+        for i in range(generation):
+            # Parent selection
+            parents = self.choose_parent()
+            print('--- parents ---')
+            print_custom(parents)
 
-        # Crossover
-        children = self.do_crossover(parents)
-        print('--- children ---')
-        print_custom(children)
+            # Crossover
+            while True:
+                crossover_children = self.do_crossover(parents)
+                # Proceed only when children are all valid
+                if not EvolutionaryAlgorithm.is_valid_individuals(crossover_children):
+                    continue
 
-        # Mutation & Survivor selection
-        for child in children:
-            child = self.do_mutation(child)
-            # heapq.heappushpop(self.population, child)
+                # Mutation
+                mutation_children = [self.do_mutation(child) for child in crossover_children]
+                # Proceed only when children are all valid
+                if EvolutionaryAlgorithm.is_valid_individuals(mutation_children):
+                    break
+
+            print('--- children ---')
+            print_custom(mutation_children)
+
+            # Survivor selection
+            for child in mutation_children:
+                heapq.heappushpop(self.population, child)
+
+            self.record_result()
 
     def choose_parent(self) -> [Individual]:
+        parents = []
         if self.PARENT_SELECTION == ParentSelectionMethod.FITNESS_BASED:
-            pass
+            parents = self.get_best_individual(2)
         elif self.PARENT_SELECTION == ParentSelectionMethod.TOURNAMENT_SELECTION:
-            parents = []
             for _ in range(2):
                 participants = [self.population[i] for i in random.sample(range(self.POPULATION_SIZE), 2)]
                 participants.sort(reverse=True)
@@ -145,10 +171,13 @@ class EvolutionaryAlgorithm:
                 # if prob in [0,0.8], choose the winner (i.e., participant[0])
                 # else if prob in (0.8,1], choose the loser (i.e., participant[1])
                 parents.append(participants[int(prob/0.8)])
-            return parents
+        return parents
 
-    def choose_best_individual(self):
-        return heapq.nlargest(1, self.population)[0]
+    def get_best_individual(self, kount = 1):
+        # get one with least fitness
+        # however, we implement the __lt__ in the reversed way, so we choose the largest one here
+        ret = heapq.nlargest(kount, self.population)
+        return ret[0] if kount == 1 else ret
 
     def do_crossover(self, parents: [Individual]) -> [Individual]:
         assert len(parents) == 2
@@ -175,25 +204,57 @@ class EvolutionaryAlgorithm:
             should_swap = False
             for i in range(size):
                 if i in crossover_points:
-                    should_swap = ~should_swap
+                    should_swap = not should_swap
                 child_one_gene.append(parents[0 if not should_swap else 1].genes[i])
                 child_two_gene.append(parents[1 if not should_swap else 0].genes[i])
             children.append(Individual(self.k, child_one_gene, self.data))
             children.append(Individual(self.k, child_two_gene, self.data))
         elif self.CROSSOVER == CrossoverMethod.UNIFORM:
-            pass
-
+            child_one_gene = []
+            child_two_gene = []
+            for i in range(size):
+                prob = random.uniform(0, 1)
+                # if prob in [0,0.5) -> child_one gets parent[0], child_two gets parent[1] => i.e. should not swap
+                # else if prob in [0.5,1] -> child_one gets parent[1], child_two gets parent[0] => i.e. should swap
+                child_one_gene.append(parents[int(prob/0.5)].genes[i])
+                child_two_gene.append(parents[(int(prob/0.5)+1)%2].genes[i])
+            children.append(Individual(self.k, child_one_gene, self.data))
+            children.append(Individual(self.k, child_two_gene, self.data))
         return children
 
     def do_mutation(self, an_idv: Individual) -> Individual:
-        pass
+        for i in range(an_idv.gene_size):
+            should_mutate = random.uniform(0, 1)
+            if should_mutate > self.MUTATE_PROBABILITY:
+                continue
+            an_idv.genes[i] = random.randint(0, self.k-1)
+        if an_idv.is_valid():
+            an_idv.update()
+        return an_idv
+
+    def record_result(self):
+        best = self.get_best_individual()
+        self.result.append({"genes": best.genes, "fitness": best.get_fitness(), "centroids": best.get_centroids()})
+
+    @staticmethod
+    def is_valid_individuals(idvs: [Individual]):
+        for idv in idvs:
+            if not idv.is_valid():
+                return False
+        return True
+
 
 if __name__ == '__main__':
 
     # generate number
     # x = random_ints(50, 100)
-    x = [i for i in range(10)]
-    ea = EvolutionaryAlgorithm(2, x)
-    ea.CROSSOVER = CrossoverMethod.TWO_POINT
+    x = [i for i in range(100)]
+    ea = EvolutionaryAlgorithm(10, x)
+    ea.PARENT_SELECTION = ParentSelectionMethod.FITNESS_BASED
+    ea.CROSSOVER = CrossoverMethod.UNIFORM
     print(ea)
     ea.do(10)
+    print(ea)
+
+    print(ea.get_best_individual())
+    print(ea.result)
