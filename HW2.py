@@ -1,6 +1,9 @@
 import random
-from enum import IntEnum
 import heapq
+import matplotlib.pyplot as plt
+from enum import IntEnum
+import datetime
+
 
 def random_ints(count: int, limit: int = 1) -> [int]:
     """
@@ -28,7 +31,7 @@ class Individual:
         """
         self.k = k
         self.gene_size = len(genes)
-        self.genes = genes
+        self.gene = genes
         self.fitness = None
         self.centroids = None
         self.data = data
@@ -43,21 +46,21 @@ class Individual:
             self.update_centroids()
         return self.centroids
 
-    def update(self):
+    def update(self) -> None:
         self.update_centroids()
         self.update_fitness()
 
-    def update_fitness(self):
+    def update_fitness(self) -> None:
         self.fitness = 0.0
         centroids = self.get_centroids()
         for i in range(self.gene_size):
-            self.fitness += pow(self.data[i] - centroids[self.genes[i]], 2)
+            self.fitness += pow(self.data[i] - centroids[self.gene[i]], 2)
 
-    def update_centroids(self):
+    def update_centroids(self) -> None:
         num_of_points_in_cluster = [0] * self.k
         sum_of_coordinate_in_cluster = [0.0] * self.k
         for i in range(self.gene_size):
-            cluster_num = self.genes[i]
+            cluster_num = self.gene[i]
             coordinate = self.data[i]
             num_of_points_in_cluster[cluster_num] += 1
             sum_of_coordinate_in_cluster[cluster_num] += coordinate
@@ -66,26 +69,26 @@ class Individual:
     # only valid if there's at least one point in each cluster
     def is_valid(self) -> bool:
         ret = [False for _ in range(self.k)]
-        for g in self.genes:
+        for g in self.gene:
             ret[g] = True
         for r in ret:
             if not r:
                 return False
         return True
 
-    def __str__(self):
-        return "k = %d, data = %s, genes = %s, fitness = %.3f, centroids = %s" \
-               % (self.k, self.data if self.data else 'None', self.genes.__str__(),
+    def __str__(self) -> str:
+        return "k = %d, data = %s, gene = %s, fitness = %.3f, centroids = %s" \
+               % (self.k, self.data if self.data else 'None', self.gene.__str__(),
                   self.fitness if self.fitness else self.get_fitness(),
                   self.get_centroids().__str__())
 
-    def __lt__(self, other):
+    def __lt__(self, other) -> bool:
         # in our case, fitness is the lower the better
         return self.get_fitness() > other.get_fitness()
 
 
 class ParentSelectionMethod(IntEnum):
-    FITNESS_BASED = 1   # @TODO
+    FITNESS_BASED = 1
     TOURNAMENT_SELECTION = 2
 
 
@@ -97,7 +100,7 @@ class CrossoverMethod(IntEnum):
 
 
 class EvolutionaryAlgorithm:
-    POPULATION_SIZE = 100
+    POPULATION_SIZE = 1000
     PARENT_SELECTION = ParentSelectionMethod.TOURNAMENT_SELECTION
     CROSSOVER = CrossoverMethod.MEAN
     MUTATE_PROBABILITY = 0.4
@@ -107,7 +110,8 @@ class EvolutionaryAlgorithm:
         self.data_size = len(data)
         self.data = data
         self.population = []
-        self.result = []
+        self.result = {"gene":[], "fitness": [], "centroids": []}
+        self.generation = 1
 
         # generate enough `valid` individuals
         kount = 0
@@ -123,22 +127,24 @@ class EvolutionaryAlgorithm:
 
         self.record_result()
 
-    def __str__(self):
+    def __str__(self) -> str:
         ret = ''
         for p in self.population:
             ret += p.__str__() + '\n'
         return ret
 
-    def do(self, generation: int):
+    def do(self, generation: int) -> None:
+        self.generation += generation
 
         for i in range(generation):
             # Parent selection
             parents = self.choose_parent()
-            print('--- parents ---')
-            print_custom(parents)
+            # print('--- parents ---')
+            # print_custom(parents)
 
-            # Crossover
+            # to ensure the validity of children
             while True:
+                # Crossover
                 crossover_children = self.do_crossover(parents)
                 # Proceed only when children are all valid
                 if not EvolutionaryAlgorithm.is_valid_individuals(crossover_children):
@@ -150,8 +156,8 @@ class EvolutionaryAlgorithm:
                 if EvolutionaryAlgorithm.is_valid_individuals(mutation_children):
                     break
 
-            print('--- children ---')
-            print_custom(mutation_children)
+            # print('--- children ---')
+            # print_custom(mutation_children)
 
             # Survivor selection
             for child in mutation_children:
@@ -205,8 +211,8 @@ class EvolutionaryAlgorithm:
             for i in range(size):
                 if i in crossover_points:
                     should_swap = not should_swap
-                child_one_gene.append(parents[0 if not should_swap else 1].genes[i])
-                child_two_gene.append(parents[1 if not should_swap else 0].genes[i])
+                child_one_gene.append(parents[0 if not should_swap else 1].gene[i])
+                child_two_gene.append(parents[1 if not should_swap else 0].gene[i])
             children.append(Individual(self.k, child_one_gene, self.data))
             children.append(Individual(self.k, child_two_gene, self.data))
         elif self.CROSSOVER == CrossoverMethod.UNIFORM:
@@ -216,8 +222,8 @@ class EvolutionaryAlgorithm:
                 prob = random.uniform(0, 1)
                 # if prob in [0,0.5) -> child_one gets parent[0], child_two gets parent[1] => i.e. should not swap
                 # else if prob in [0.5,1] -> child_one gets parent[1], child_two gets parent[0] => i.e. should swap
-                child_one_gene.append(parents[int(prob/0.5)].genes[i])
-                child_two_gene.append(parents[(int(prob/0.5)+1)%2].genes[i])
+                child_one_gene.append(parents[int(prob/0.5)].gene[i])
+                child_two_gene.append(parents[(int(prob/0.5)+1)%2].gene[i])
             children.append(Individual(self.k, child_one_gene, self.data))
             children.append(Individual(self.k, child_two_gene, self.data))
         return children
@@ -227,17 +233,43 @@ class EvolutionaryAlgorithm:
             should_mutate = random.uniform(0, 1)
             if should_mutate > self.MUTATE_PROBABILITY:
                 continue
-            an_idv.genes[i] = random.randint(0, self.k-1)
-        if an_idv.is_valid():
+            an_idv.gene[i] = random.randint(0, self.k - 1)
+        if an_idv.is_valid():   # in case we mutate sth invalid
             an_idv.update()
         return an_idv
 
-    def record_result(self):
+    def record_result(self) -> None:
         best = self.get_best_individual()
-        self.result.append({"genes": best.genes, "fitness": best.get_fitness(), "centroids": best.get_centroids()})
+        self.result["gene"].append(best.gene)
+        self.result["fitness"].append(best.get_fitness())
+        self.result["centroids"].append(best.get_centroids())
+
+    def draw(self, timestamp=None) -> None:
+        figure_filename = '%u-%dk-%dg-%ddata-%dpopu-%dPS-%dCO-%.1fMP' \
+                          % (timestamp if timestamp else datetime.datetime.now().timestamp(),
+                             self.k, self.generation, self.data_size, len(self.population),
+                             self.PARENT_SELECTION, self.CROSSOVER, self.MUTATE_PROBABILITY)
+
+        figure_title = '%dk,%dgen, %ddata, %dpopu, PS%d, CO%d, %.1fMP' \
+                          % (self.k, self.generation, self.data_size, len(self.population),
+                             self.PARENT_SELECTION, self.CROSSOVER, self.MUTATE_PROBABILITY)
+
+        figure = plt.figure()
+        x = list(range(self.generation))
+        fitness = self.result["fitness"]
+        y_min = min(fitness) * 0.98
+        y_max = max(fitness) * 1.01
+        plt.plot(x, fitness)
+        plt.xlabel("Generation")
+        plt.ylabel("Fitness")
+        figure.canvas.set_window_title(figure_filename)
+        ax = figure.add_subplot(111)
+        ax.set_title(figure_title)
+        # plt.show()
+        plt.savefig(figure_filename + '.png')
 
     @staticmethod
-    def is_valid_individuals(idvs: [Individual]):
+    def is_valid_individuals(idvs: [Individual]) -> bool:
         for idv in idvs:
             if not idv.is_valid():
                 return False
@@ -246,15 +278,28 @@ class EvolutionaryAlgorithm:
 
 if __name__ == '__main__':
 
+    start_time = datetime.datetime.now()
+    timestamp = start_time.timestamp()
     # generate number
-    # x = random_ints(50, 100)
-    x = [i for i in range(100)]
-    ea = EvolutionaryAlgorithm(10, x)
+    x = random_ints(500, 10000)
+    # x = [i for i in range(100)]
+    ea = EvolutionaryAlgorithm(4, x)
     ea.PARENT_SELECTION = ParentSelectionMethod.FITNESS_BASED
     ea.CROSSOVER = CrossoverMethod.UNIFORM
-    print(ea)
-    ea.do(10)
-    print(ea)
+    # print(ea)
+    ea.do(1000)
+    # print(ea)
 
-    print(ea.get_best_individual())
-    print(ea.result)
+    # print(ea.get_best_individual())
+    # print(ea.result['fitness'])
+    ea.draw(timestamp)
+    end_time = datetime.datetime.now()
+    log_file_name = '%u_log.txt' % timestamp
+    log_file = open(log_file_name, 'w+')
+    print('start_time = %u, end_time = %u, duration = %s'
+          % (timestamp, end_time.timestamp(), end_time-start_time), file=log_file)
+    print('data:\n', x, file=log_file)
+    print('best_individual:\n', ea.get_best_individual(), file=log_file)
+    print('fitness_result:\n', ea.result["fitness"], file=log_file)
+    log_file.close()
+    print('Done.')
