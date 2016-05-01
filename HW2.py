@@ -3,6 +3,7 @@ import heapq
 import matplotlib.pyplot as plt
 from enum import IntEnum
 import datetime
+import pickle
 
 
 def random_ints(count: int, limit: int = 1) -> [int]:
@@ -103,7 +104,7 @@ class EvolutionaryAlgorithm:
     POPULATION_SIZE = 1000
     PARENT_SELECTION = ParentSelectionMethod.TOURNAMENT_SELECTION
     CROSSOVER = CrossoverMethod.MEAN
-    MUTATE_PROBABILITY = 0.4
+    MUTATE_PROBABILITY = 0.6
 
     def __init__(self, k: int, data: [int]):
         self.k = k
@@ -250,7 +251,7 @@ class EvolutionaryAlgorithm:
                              self.k, self.generation, self.data_size, len(self.population),
                              self.PARENT_SELECTION, self.CROSSOVER, self.MUTATE_PROBABILITY)
 
-        figure_title = '%dk,%dgen, %ddata, %dpopu, PS%d, CO%d, %.1fMP' \
+        figure_title = '%dk, %dgen, %ddata, %dpopu, PS%d, CO%d, %.1fMP' \
                           % (self.k, self.generation, self.data_size, len(self.population),
                              self.PARENT_SELECTION, self.CROSSOVER, self.MUTATE_PROBABILITY)
 
@@ -278,28 +279,40 @@ class EvolutionaryAlgorithm:
 
 if __name__ == '__main__':
 
-    start_time = datetime.datetime.now()
-    timestamp = start_time.timestamp()
-    # generate number
-    x = random_ints(500, 10000)
-    # x = [i for i in range(100)]
-    ea = EvolutionaryAlgorithm(4, x)
-    ea.PARENT_SELECTION = ParentSelectionMethod.FITNESS_BASED
-    ea.CROSSOVER = CrossoverMethod.UNIFORM
-    # print(ea)
-    ea.do(1000)
-    # print(ea)
 
-    # print(ea.get_best_individual())
-    # print(ea.result['fitness'])
-    ea.draw(timestamp)
-    end_time = datetime.datetime.now()
-    log_file_name = '%u_log.txt' % timestamp
-    log_file = open(log_file_name, 'w+')
-    print('start_time = %u, end_time = %u, duration = %s'
-          % (timestamp, end_time.timestamp(), end_time-start_time), file=log_file)
-    print('data:\n', x, file=log_file)
-    print('best_individual:\n', ea.get_best_individual(), file=log_file)
-    print('fitness_result:\n', ea.result["fitness"], file=log_file)
-    log_file.close()
-    print('Done.')
+    # generate number
+    input_filename = 'input.pickle'
+    # x = random_ints(1000, 10000)
+    # pickle.dump(x, open(input_filename, 'wb'))
+    x = pickle.load(open(input_filename, 'rb'))
+    for k in range(1, 11):
+        start_time = datetime.datetime.now()
+        timestamp = start_time.timestamp()
+        ea = EvolutionaryAlgorithm(k, x)
+        ea.PARENT_SELECTION = ParentSelectionMethod.FITNESS_BASED
+        ea.CROSSOVER = CrossoverMethod.UNIFORM
+        ea.do(10000)
+
+        # print(ea.get_best_individual())
+        # print(ea.result['fitness'])
+        ea.draw(timestamp)
+        end_time = datetime.datetime.now()
+
+        log_file_name = '%u_log.txt' % timestamp
+        log_file = open(log_file_name, 'w+')
+        print('start_time = %u, end_time = %u, duration = %s'
+              % (timestamp, end_time.timestamp(), end_time-start_time), file=log_file)
+        print('k = %d, %d generations, %d data points , population = %d, %.1f mutation probability'\
+                          % (ea.k, ea.generation, ea.data_size, len(ea.population), ea.MUTATE_PROBABILITY), file=log_file)
+        parent_selection_method = ['', 'Fitness-based', 'Tournament selection']
+        crossover_method = ['', 'arithmetic mean', '1-point crossover', '2-point crossover', 'Uniform crossover']
+        print('ParentSelectionMethod = %s' % parent_selection_method[ea.PARENT_SELECTION], file=log_file)
+        print('CrossoverMethod = %s' % crossover_method[ea.CROSSOVER], file=log_file)
+        print('data:\n', x, file=log_file)
+        print('best_individual:\n', ea.get_best_individual(), file=log_file)
+        print('fitness_result:\n', ea.result["fitness"], file=log_file)
+        log_file.close()
+
+        print('No. %d Done.' %k)
+
+    print('ALL Done.')
