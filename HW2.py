@@ -80,8 +80,8 @@ class ParentSelectionMethod(IntEnum):
 
 class CrossoverMethod(IntEnum):
     MEAN = 1
-    ONE_POINT_ = 2  # @TODO
-    TWO_POINT = 3   # @TODO
+    ONE_POINT = 2
+    TWO_POINT = 3
     UNIFORM = 4     # @TODO
 
 
@@ -116,18 +116,22 @@ class EvolutionaryAlgorithm:
             ret += p.__str__() + '\n'
         return ret
 
-    def do(self, generation_count: int):
+    def do(self, kount_generation: int):
 
         # Parent selection
         parents = self.choose_parent()
+        print('--- parents ---')
+        print_custom(parents)
 
         # Crossover
         children = self.do_crossover(parents)
+        print('--- children ---')
+        print_custom(children)
 
         # Mutation & Survivor selection
         for child in children:
             child = self.do_mutation(child)
-            heapq.heappushpop(self.population, child)
+            # heapq.heappushpop(self.population, child)
 
     def choose_parent(self) -> [Individual]:
         if self.PARENT_SELECTION == ParentSelectionMethod.FITNESS_BASED:
@@ -147,7 +151,39 @@ class EvolutionaryAlgorithm:
         return heapq.nlargest(1, self.population)[0]
 
     def do_crossover(self, parents: [Individual]) -> [Individual]:
-        pass
+        assert len(parents) == 2
+        assert parents[0].gene_size == parents[1].gene_size
+
+        size = parents[0].gene_size
+        children = []
+
+        if self.CROSSOVER == CrossoverMethod.MEAN:
+            new_gene = [int((parents[0].genes[i]+parents[1].genes[i])/2) for i in range(size)]
+            children.append(Individual(self.k, new_gene, self.data))
+        elif self.CROSSOVER == CrossoverMethod.ONE_POINT or self.CROSSOVER == CrossoverMethod.TWO_POINT:
+            num_of_crossover_points = 0
+            if self.CROSSOVER == CrossoverMethod.ONE_POINT:
+                num_of_crossover_points = 1
+            elif self.CROSSOVER == CrossoverMethod.TWO_POINT:
+                num_of_crossover_points = 2
+
+            # only get crossover_point between (1, size-1) to avoid get same children as parents
+            crossover_points = random.sample(range(1, size-1), num_of_crossover_points)
+
+            child_one_gene = []
+            child_two_gene = []
+            should_swap = False
+            for i in range(size):
+                if i in crossover_points:
+                    should_swap = ~should_swap
+                child_one_gene.append(parents[0 if not should_swap else 1].genes[i])
+                child_two_gene.append(parents[1 if not should_swap else 0].genes[i])
+            children.append(Individual(self.k, child_one_gene, self.data))
+            children.append(Individual(self.k, child_two_gene, self.data))
+        elif self.CROSSOVER == CrossoverMethod.UNIFORM:
+            pass
+
+        return children
 
     def do_mutation(self, an_idv: Individual) -> Individual:
         pass
@@ -156,7 +192,8 @@ if __name__ == '__main__':
 
     # generate number
     # x = random_ints(50, 100)
-    x = [i for i in range(4)]
+    x = [i for i in range(10)]
     ea = EvolutionaryAlgorithm(2, x)
+    ea.CROSSOVER = CrossoverMethod.TWO_POINT
     print(ea)
     ea.do(10)
