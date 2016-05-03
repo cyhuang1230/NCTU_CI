@@ -6,14 +6,14 @@ import datetime
 import pickle
 
 
-def random_ints(count: int, limit: int = 1) -> [int]:
+def random_ints(count: int, upper_bound: int = 1, lower_bound = 0) -> [int]:
     """
     :param count:
-    :param limit: inclusive
+    :param upper_bound: exclusive
     :return:
     """
     random.seed()
-    return [random.randint(0, limit-1) for _ in range(count)]
+    return [random.randint(lower_bound, upper_bound - 1) for _ in range(count)]
 
 
 def print_custom(l: list):
@@ -104,7 +104,7 @@ class EvolutionaryAlgorithm:
     POPULATION_SIZE = 1000
     PARENT_SELECTION = ParentSelectionMethod.TOURNAMENT_SELECTION
     CROSSOVER = CrossoverMethod.MEAN
-    MUTATE_PROBABILITY = 0.6
+    MUTATE_PROBABILITY = 0.4
 
     def __init__(self, k: int, data: [int]):
         self.k = k
@@ -136,8 +136,9 @@ class EvolutionaryAlgorithm:
 
     def do(self, generation: int) -> None:
         self.generation += generation
-
+        print('This is k = %d, going to run %d generations' % (self.k, generation))
         for i in range(generation):
+            print('This is k = %d, running generation #%d' % (self.k, i), end='\r')
             # Parent selection
             parents = self.choose_parent()
             # print('--- parents ---')
@@ -194,7 +195,7 @@ class EvolutionaryAlgorithm:
         children = []
 
         if self.CROSSOVER == CrossoverMethod.MEAN:
-            new_gene = [int((parents[0].genes[i]+parents[1].genes[i])/2) for i in range(size)]
+            new_gene = [int((parents[0].gene[i]+parents[1].gene[i])/2) for i in range(size)]
             children.append(Individual(self.k, new_gene, self.data))
         elif self.CROSSOVER == CrossoverMethod.ONE_POINT or self.CROSSOVER == CrossoverMethod.TWO_POINT:
             num_of_crossover_points = 0
@@ -263,6 +264,7 @@ class EvolutionaryAlgorithm:
         plt.plot(x, fitness)
         plt.xlabel("Generation")
         plt.ylabel("Fitness")
+        # plt.axis([0, self.generation, y_min, y_max])
         figure.canvas.set_window_title(figure_filename)
         ax = figure.add_subplot(111)
         ax.set_title(figure_title)
@@ -279,19 +281,35 @@ class EvolutionaryAlgorithm:
 
 if __name__ == '__main__':
 
-
     # generate number
-    input_filename = 'input.pickle'
-    # x = random_ints(1000, 10000)
+    input_filename = 'input2.pickle'
+    # x = random_ints(300, 500) + random_ints(300, 1500, 1000) \
+    #     + random_ints(300, 3000, 2000) + random_ints(300, 6000, 4000) + random_ints(100, 10000, 8000)
     # pickle.dump(x, open(input_filename, 'wb'))
     x = pickle.load(open(input_filename, 'rb'))
-    for k in range(1, 11):
+    # fig = plt.figure()
+    # plt.plot(x, [0]*len(x), '.')
+    # l = [481.5868725868726, 4245.645348837209, 1634.7429906542056, 2664.6263736263736, 6912.526315789473, 988.0176991150443]
+    # for ll in l:
+    #     plt.axvline(ll, ymin=0.4, ymax=0.6, color='r', ls=':')
+    # plt.xlabel('x')
+    # plt.show()
+    # exit()
+    result_fitness = {"k": [], "fitness": [], "m": [], "ps": [], "co": []}
+    # for m in [0.0, 0.2, 0.4, 0.6, 0.8]:
+    # for co in [2,3,4]:
+    for _ in range(1):
+        co = CrossoverMethod.UNIFORM
+        ps = ParentSelectionMethod.TOURNAMENT_SELECTION
+        m = 0.0
+        k = 6
         start_time = datetime.datetime.now()
         timestamp = start_time.timestamp()
         ea = EvolutionaryAlgorithm(k, x)
-        ea.PARENT_SELECTION = ParentSelectionMethod.FITNESS_BASED
-        ea.CROSSOVER = CrossoverMethod.UNIFORM
-        ea.do(10000)
+        ea.PARENT_SELECTION = ps
+        ea.CROSSOVER = co
+        ea.MUTATE_PROBABILITY = m
+        ea.do(100000)
 
         # print(ea.get_best_individual())
         # print(ea.result['fitness'])
@@ -313,6 +331,22 @@ if __name__ == '__main__':
         print('fitness_result:\n', ea.result["fitness"], file=log_file)
         log_file.close()
 
+        result_fitness["k"].append(k)
+        result_fitness["fitness"].append(ea.get_best_individual().get_fitness())
+        result_fitness["m"].append(m)
+        result_fitness["ps"].append(ps)
+        result_fitness["co"].append(co)
         print('No. %d Done.' %k)
+
+    print(result_fitness)
+    to_plot = "co"
+    result_figure = plt.figure()
+    plt.plot(result_fitness[to_plot], result_fitness["fitness"])
+    plt.xlabel(to_plot)
+    plt.ylabel('Fitness')
+    result_figure.canvas.set_window_title('k-fitness')
+    plt.xticks([i for i in result_fitness[to_plot]])
+    # plt.show()
+    plt.savefig('%u_result.png' % datetime.datetime.now().timestamp())
 
     print('ALL Done.')
